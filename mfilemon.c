@@ -62,12 +62,13 @@
 #include <trace/events/syscalls.h>
 #include <trace/events/sched.h>
 #include <linux/semaphore.h>
+#include <linux/time.h>
 
 #include "filemon.h"
 
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_AUTHOR("Tom Rix <trix@juniper.net>");
-MODULE_VERSION("12.5.9");
+MODULE_VERSION("12.5.10");
 
 static struct class *filemon_class;
 static int filemon_major = -ENODEV;
@@ -112,12 +113,15 @@ filemon_kernel_write(struct file *file, const char *buf, size_t count)
 {
 	/* From /usr/src/linux/fs/splice.c; see also Linux Magazine,
 	 * "Kernel System Calls" by Alessandro Rubini. */
-	mm_segment_t old_fs;
 	ssize_t res;
 	loff_t pos;
 
-	old_fs = get_fs();
-	set_fs(get_ds());
+	#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0))
+		mm_segment_t old_fs;
+		oldfs = get_fs();
+		set_fs(get_ds());
+	#endif
+
 	/* FIXME We don't handle partial writes (such as -EINTR).  Since
 	 * we don't lock the filemon, we can't just resume the write at
 	 * the point of the interruption, or we'd get interleaved data if
@@ -130,10 +134,13 @@ filemon_kernel_write(struct file *file, const char *buf, size_t count)
 	 * write syscall does.  Not sure why, though. */
 	pos = file->f_pos;
 	/* The cast to a user pointer is valid due to the set_fs() */
-	res = vfs_write(file, (const char __user *)buf, count, &pos);
+	res = __kernel_write(file, (const char __user *)buf, count, &pos);
 	file->f_pos = pos;
-	set_fs(old_fs);
 
+	#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0))
+		set_fs(oldfs);
+	#endif
+	
 	return res;
 }
 
@@ -256,10 +263,8 @@ void __printf(2, 3)
 static void
 filemon_header(struct filemon *fm)
 {
-	struct timespec t;
+	nanoseconds ns = ktime_get_real_ns();
 	pid_t curpid;
-
-	getnstimeofday(&t);
 
 	/* Note that we log "Target pid" as current.  That's in line with
 	 * NetBSD filemon. */
@@ -271,20 +276,19 @@ filemon_header(struct filemon *fm)
 			"# Start %llu.%06llu\n"
 			"V %d"),
 		       FILEMON_VERSION, curpid,
-		       (unsigned long long) t.tv_sec,
-		       (unsigned long long) (t.tv_nsec / 1000),
+		       (unsigned long long) ns,
+		       (unsigned long long) (ns / 1000),
 		       FILEMON_VERSION);
 }
 
 static void
 filemon_footer(struct filemon *fm) {
-	struct timespec t;
-	getnstimeofday(&t);
+	nanoseconds ns = ktime_get_real_ns();
 	filemon_printf(fm,
 		       ("# Stop %llu.%06llu\n"
 			"# Bye bye"),
-		       (unsigned long long) t.tv_sec,
-		       (unsigned long long) (t.tv_nsec / 1000));
+		       (unsigned long long) ns,
+		       (unsigned long long) (ns / 1000));
 }
 
 struct fm_pids *
@@ -565,8 +569,8 @@ static void filemon_exit(void)
 	DEV_WRITE_LOCK();
 
 	dev = MKDEV(filemon_major, 0);
-	unregister_trace_sys_enter(TRACE_CTX_FUNC(filemon_handle_sys_enter));
-	unregister_trace_sys_exit(TRACE_CTX_FUNC(filemon_handle_sys_exit));
+	unregister_trace_sys_enter((void*)TRACE_CTX_FUNC(filemon_handle_sys_enter), NULL);
+	unregister_trace_sys_exit((void*)TRACE_CTX_FUNC(filemon_handle_sys_exit), NULL);
 	tracepoint_synchronize_unregister();
 	device_destroy(filemon_class, dev);
 	filemon_device = NULL;
@@ -614,13 +618,13 @@ static int __init filemon_init(void)
 	}
 
 	ret = register_trace_sys_enter(
-		TRACE_CTX_FUNC(filemon_handle_sys_enter));
+		(void*)TRACE_CTX_FUNC(filemon_handle_sys_enter), NULL);
 	if (ret != 0) {
 		printk(KERN_INFO "filemon error registering sys_enter\n");
 		goto err_register_trace_sys_enter;
 	}
 
-	ret = register_trace_sys_exit(TRACE_CTX_FUNC(filemon_handle_sys_exit));
+	ret = register_trace_sys_exit((void*)TRACE_CTX_FUNC(filemon_handle_sys_exit), NULL);
 	if (ret != 0) {
 		printk(KERN_INFO "filemon error registering sys_exit\n");
 		goto err_register_trace_sys_exit;
@@ -639,7 +643,7 @@ end:
 	return ret;
 
 err_register_trace_sys_exit:
-	unregister_trace_sys_enter(TRACE_CTX_FUNC(filemon_handle_sys_enter));
+	unregister_trace_sys_enter((void*)TRACE_CTX_FUNC(filemon_handle_sys_enter), NULL);
 
 err_register_trace_sys_enter:
 	device_destroy(filemon_class, dev);

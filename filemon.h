@@ -207,6 +207,8 @@ struct filemon {
 	void   *msg_buf;
 };
 
+typedef u64 nanoseconds;
+
 #define LIST_ADD list_add
 #define LIST_DEL list_del
 

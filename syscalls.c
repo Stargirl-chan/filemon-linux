@@ -140,7 +140,7 @@ static long _fm_syscall_get_nr(struct task_struct *task, struct pt_regs *regs)
 	long ret = -1;
 #ifdef CONFIG_X86_64
 	/* Check if this is a 32 bit process running on 64 bit kernel */
-	int ia32 = test_tsk_thread_flag(task, TIF_IA32);
+	int ia32 = test_tsk_thread_flag(task, any_64bit_mode(current_pt_regs()));
 	if (ia32) {
 		long ia32_id = syscall_get_nr(task, regs);
 		if (ia32_id >= 0 && ia32_id < FILEMON_SYSCALLS_IA32_SIZE)
@@ -153,6 +153,20 @@ static long _fm_syscall_get_nr(struct task_struct *task, struct pt_regs *regs)
 #endif
 	return ret;
 }
+
+/* The syscall_get_arguments function chnaged its parameters.
+ * Starting with version 5.1.0
+*/
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 1, 0))
+#define syscall_get_arguments_deprecated syscall_get_arguments
+#else
+#define syscall_get_arguments_deprecated(_task, _reg, _start, _len, _args) \
+	do { \
+		unsigned long _sga_args[6] = {}; \
+		syscall_get_arguments(_task, _reg, _sga_args); \
+		memcpy(_args, &_sga_args[_start], _len); \
+	} while(0)
+#endif
 
 /* Log an open(2) system call. */
 static void
@@ -176,7 +190,7 @@ handle_open(struct filemon *filemon,
 	FILEMON_GETNAME_TYPE fname;
 	int accmode;
 
-	syscall_get_arguments(current, regs,
+	syscall_get_arguments_deprecated(current, regs,
 			      0, /* first argument number to get */
 			      is_at ? 3 : 2, /* number of args */
 			      ((unsigned long *)&args) + (is_at ? 0 : 1));
@@ -222,7 +236,7 @@ handle_int_arg(struct filemon *filemon, char op, is_at_enum is_at,
 		} arg;
 	} args = { { 0 }, { 0 } };
 
-	syscall_get_arguments(current, regs,
+	syscall_get_arguments_deprecated(current, regs,
 			      0, /* first argument number to get */
 			      is_at ? 2 : 1, /* number of args */
 			      ((unsigned long *)&args) + (is_at ? 0 : 1));
@@ -260,7 +274,7 @@ handle_name_arg(struct filemon *filemon, char op, is_at_enum is_at,
 	} args = { { 0 }, { 0 } };
 	FILEMON_GETNAME_TYPE fname;
 
-	syscall_get_arguments(current, regs,
+	syscall_get_arguments_deprecated(current, regs,
 			      0, /* first argument number to get */
 			      is_at ? 2 : 1, /* number of args */
 			      ((unsigned long *)&args) + (is_at ? 0 : 1));
@@ -293,7 +307,7 @@ handle_2name_arg(struct filemon *filemon, char op, is_at_enum is_at,
 	} args[4] = { { 0 }, { 0 }, { 0 }, { 0 } };
 	FILEMON_GETNAME_TYPE fnames[2];
 
-	syscall_get_arguments(current, regs,
+	syscall_get_arguments_deprecated(current, regs,
 			      0, /* first argument number to get */
 			      is_at ? 4 : 2, /* number of args */
 			      (unsigned long *)&args);
@@ -385,7 +399,7 @@ handle_symlinkat(struct filemon *filemon, char op,
 	} args[3] = { { 0 }, { 0 }, { 0 } };
 	FILEMON_GETNAME_TYPE fnames[2];
 
-	syscall_get_arguments(current, regs,
+	syscall_get_arguments_deprecated(current, regs,
 			      0, /* first argument number to get */
 			      3, /* number of args */
 			      (unsigned long *)&args);
@@ -480,7 +494,7 @@ handle_execve_enter(struct filemon *filemon __maybe_unused,
 		 * succeed, if we can't allocate a few words. */
 		return;
 	entry->task = current;
-	syscall_get_arguments(current, regs,
+	syscall_get_arguments_deprecated(current, regs,
 			      0, /* first argument number to get */
 			      is_at ? 2 : 1, /* number of args */
 			      ((unsigned long *)&args) + (is_at ? 0 : 1));

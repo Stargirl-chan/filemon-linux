@@ -1,0 +1,11 @@
+diff '--color=auto' -Naur a/kernel/trace/trace_syscalls.c b/kernel/trace/trace_syscalls.c
+--- a/kernel/trace/trace_syscalls.c	2022-03-11 12:42:10.000000000 +0100
++++ b/kernel/trace/trace_syscalls.c	2022-03-20 19:06:19.154788479 +0100
+@@ -821,3 +821,7 @@
+ 	}
+ 	return 0;
+ }
++
++/* Needed for filemon */
++EXPORT_TRACEPOINT_SYMBOL_GPL(sys_enter);
++EXPORT_TRACEPOINT_SYMBOL_GPL(sys_exit);
