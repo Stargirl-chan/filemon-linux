@@ -276,7 +276,7 @@ filemon_header(struct filemon *fm)
 			"# Start %llu.%06llu\n"
 			"V %d"),
 		       FILEMON_VERSION, curpid,
-		       (unsigned long long) ns,
+		       (unsigned long long) ns / 1000000000,
 		       (unsigned long long) (ns / 1000),
 		       FILEMON_VERSION);
 }
@@ -287,7 +287,7 @@ filemon_footer(struct filemon *fm) {
 	filemon_printf(fm,
 		       ("# Stop %llu.%06llu\n"
 			"# Bye bye"),
-		       (unsigned long long) ns,
+		       (unsigned long long) ns / 1000000000,
 		       (unsigned long long) (ns / 1000));
 }
 
