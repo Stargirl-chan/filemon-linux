@@ -140,7 +140,7 @@ static long _fm_syscall_get_nr(struct task_struct *task, struct pt_regs *regs)
 	long ret = -1;
 #ifdef CONFIG_X86_64
 	/* Check if this is a 32 bit process running on 64 bit kernel */
-	int ia32 = test_tsk_thread_flag(task, any_64bit_mode(current_pt_regs()));
+	int ia32 = test_tsk_thread_flag(task, !any_64bit_mode(current_pt_regs()));
 	if (ia32) {
 		long ia32_id = syscall_get_nr(task, regs);
 		if (ia32_id >= 0 && ia32_id < FILEMON_SYSCALLS_IA32_SIZE)
