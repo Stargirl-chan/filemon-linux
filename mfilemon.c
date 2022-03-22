@@ -569,8 +569,8 @@ static void filemon_exit(void)
 	DEV_WRITE_LOCK();
 
 	dev = MKDEV(filemon_major, 0);
-	unregister_trace_sys_enter((void*)TRACE_CTX_FUNC(filemon_handle_sys_enter), NULL);
-	unregister_trace_sys_exit((void*)TRACE_CTX_FUNC(filemon_handle_sys_exit), NULL);
+	unregister_trace_sys_enter(TRACE_CTX_FUNC(filemon_handle_sys_enter));
+	unregister_trace_sys_exit(TRACE_CTX_FUNC(filemon_handle_sys_exit));
 	tracepoint_synchronize_unregister();
 	device_destroy(filemon_class, dev);
 	filemon_device = NULL;
@@ -618,13 +618,13 @@ static int __init filemon_init(void)
 	}
 
 	ret = register_trace_sys_enter(
-		(void*)TRACE_CTX_FUNC(filemon_handle_sys_enter), NULL);
+		TRACE_CTX_FUNC(filemon_handle_sys_enter));
 	if (ret != 0) {
 		printk(KERN_INFO "filemon error registering sys_enter\n");
 		goto err_register_trace_sys_enter;
 	}
 
-	ret = register_trace_sys_exit((void*)TRACE_CTX_FUNC(filemon_handle_sys_exit), NULL);
+	ret = register_trace_sys_exit(TRACE_CTX_FUNC(filemon_handle_sys_exit));
 	if (ret != 0) {
 		printk(KERN_INFO "filemon error registering sys_exit\n");
 		goto err_register_trace_sys_exit;
@@ -643,7 +643,7 @@ end:
 	return ret;
 
 err_register_trace_sys_exit:
-	unregister_trace_sys_enter((void*)TRACE_CTX_FUNC(filemon_handle_sys_enter), NULL);
+	unregister_trace_sys_enter(TRACE_CTX_FUNC(filemon_handle_sys_enter));
 
 err_register_trace_sys_enter:
 	device_destroy(filemon_class, dev);
