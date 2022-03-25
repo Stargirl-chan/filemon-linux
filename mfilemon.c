@@ -82,13 +82,20 @@ static DECLARE_RWSEM(dev_lock);
 #define DEV_READ_UNLOCK()  up_read(&dev_lock)
 #define DEV_WRITE_LOCK()   down_write(&dev_lock)
 #define DEV_WRITE_UNLOCK() up_write(&dev_lock)
-#else
+#elif FILEMON_MUTEX_LOCK
+#error "Mutex Lock causes a scheduling while atomic bug and crashes the system, need to investigate"
 static DEFINE_MUTEX(dev_lock);
 #define DEV_READ_LOCK() mutex_lock(&dev_lock)
 #define DEV_READ_UNLOCK() mutex_unlock(&dev_lock)
 #define DEV_WRITE_LOCK() mutex_lock(&dev_lock)
 #define DEV_WRITE_UNLOCK() mutex_unlock(&dev_lock)
 #define DEV_TRYLOCK() mutex_trylock(&dev_lock)
+#else
+static DEFINE_RWLOCK(dev_lock);
+#define DEV_READ_LOCK() read_lock(&dev_lock)
+#define DEV_READ_UNLOCK() read_unlock(&dev_lock)
+#define DEV_WRITE_LOCK() write_lock(&dev_lock)
+#define DEV_WRITE_UNLOCK() write_unlock(&dev_lock)
 #endif
 static int dev_number_open;
 
